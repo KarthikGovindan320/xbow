@@ -212,7 +212,7 @@ def predict_future_pos(kf, secs):
     x = kf.x.copy()
     for _ in range(steps):
         x = F_step @ x
-    return float(x[0]), float(x[1])
+    return float(x[0][0]), float(x[1][0])
 
 
 class DroneTracker:
@@ -288,7 +288,9 @@ class DroneTracker:
             kf = self._kfilters[tid]
             kf.predict()
             kf.update(np.array([[ncx], [ncy]]))
-            sx, sy = float(kf.x[0]), float(kf.x[1])
+            print("kf.x shape:", np.asarray(kf.x).shape)
+            sx = float(np.asarray(kf.x).squeeze()[0])
+            sy = float(np.asarray(kf.x).squeeze()[1])
 
             if tid in self._last_bbox:
                 lx, ly, lbw, lbh = self._last_bbox[tid]
@@ -666,6 +668,7 @@ def detection_loop():
             prev_cam = cur_cam
 
         ret, frame = cap.read()
+        frame = cv2.flip(frame, 0)
         if not ret:
             time.sleep(0.005)
             continue
@@ -1035,7 +1038,7 @@ def draw_hud(screen, fonts, snap, overlays):
     for i, tgt in enumerate(targets):
         x, y, bw, bh = tgt["bbox"]
         px   = int(x  * sx)
-        py   = int(y  * sy_)
+        py   = int((CAPTURE_HEIGHT - y - bh) * sy_)
         pbw  = int(bw * sx)
         pbh  = int(bh * sy_)
         col  = C_RED if i == 0 else C_AMBER
@@ -1049,7 +1052,7 @@ def draw_hud(screen, fonts, snap, overlays):
             draw_predicted_cross(
                 screen,
                 pred[tid]["pred_cx"] * sx,
-                pred[tid]["pred_cy"] * sy_,
+                (CAPTURE_HEIGHT - pred[tid]["pred_cy"]) * sy_, 
                 C_CYAN,
             )
 
