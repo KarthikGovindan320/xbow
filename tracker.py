@@ -34,19 +34,19 @@ WINDOW_H                = 720
 
 DRONE_MODEL_PATH        = "drone_yolov8.pt"
 GENERAL_MODEL_PATH      = "yolov8n.pt"
-DRONE_CONF_HIGH         = 0.45
-DRONE_CONF_LOW          = 0.25
+DRONE_CONF_HIGH         = 0.35 
+DRONE_CONF_LOW          = 0.20  
 CIVILIAN_CONF           = 0.50
 YOLO_IMGSZ              = 640
-SKIP_FRAMES             = 2
-STABLE_FRAMES           = 3
+SKIP_FRAMES             = 1     
+STABLE_FRAMES           = 2    
 
 COCO_PERSON_CLASS       = 0
-CIVILIAN_CLASSES        = [0, 1, 2, 3, 5, 7, 14, 15, 16, 17, 24, 25, 26, 27]
+CIVILIAN_CLASSES        = [0]
 
 TRACK_MAX_DIST_PX       = 120
 TRACK_HISTORY_LEN       = 60
-TRACK_TTL_FRAMES        = 10
+TRACK_TTL_FRAMES        = 20  
 VEL_SMOOTH_FRAMES       = 8
 
 KALMAN_DT               = 1.0 / 30.0
@@ -645,6 +645,7 @@ def detection_loop():
     cap            = open_camera(state["cam_index"][0])
     prev_cam       = state["cam_index"][0]
     stable         = 0
+    miss_ctr       = 0
     skip_ctr       = 0
     cached_targets = []
     tracker        = DroneTracker()
@@ -668,7 +669,7 @@ def detection_loop():
             prev_cam = cur_cam
 
         ret, frame = cap.read()
-        frame = cv2.flip(frame, 0)
+        frame = cv2.flip(frame, 0)  
         if not ret:
             time.sleep(0.005)
             continue
@@ -754,9 +755,13 @@ def detection_loop():
             cached_targets = prioritize_targets(annotated)
 
             if cached_targets:
-                stable = min(stable + 1, STABLE_FRAMES + 4)
+                stable   = min(stable + 1, STABLE_FRAMES + 4)
+                miss_ctr = 0
             else:
-                stable = max(0, stable - 1)
+                miss_ctr += 1
+                if miss_ctr >= 2:
+                    stable   = max(0, stable - 1)
+                    miss_ctr = 0
 
             predicted = {
                 tgt["id"]: {"pred_cx": tgt["pred_cx"], "pred_cy": tgt["pred_cy"]}
@@ -1038,7 +1043,7 @@ def draw_hud(screen, fonts, snap, overlays):
     for i, tgt in enumerate(targets):
         x, y, bw, bh = tgt["bbox"]
         px   = int(x  * sx)
-        py   = int((CAPTURE_HEIGHT - y - bh) * sy_)
+        py   = int(y  * sy_)
         pbw  = int(bw * sx)
         pbh  = int(bh * sy_)
         col  = C_RED if i == 0 else C_AMBER
@@ -1052,7 +1057,7 @@ def draw_hud(screen, fonts, snap, overlays):
             draw_predicted_cross(
                 screen,
                 pred[tid]["pred_cx"] * sx,
-                (CAPTURE_HEIGHT - pred[tid]["pred_cy"]) * sy_, 
+                pred[tid]["pred_cy"] * sy_,
                 C_CYAN,
             )
 
